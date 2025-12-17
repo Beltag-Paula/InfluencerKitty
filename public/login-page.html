@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Influencer Kitty</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+
+
+</head>
+
+<!-- <form action="/api/login" method="post"> -->
+<form onsubmit="return false;">
+    <div class="container">
+        <h1>Log In</h1>
+        <p>Please fill in this form</p>
+        <hr>
+        <label for="email"><b>Email</b></label>
+        <input type="text" placeholder="Enter your email adress" name="email" value="darwin@me" required>
+
+        <label for="password"><b>Password</b></label>
+        <input type="password" placeholder="Enter Password" name="password" value="test123" required>
+
+        <button type="submit" id="loginBtn">Login</button>
+        <label>
+            <input type="checkbox" checked="checked" name="remember"> Remember me
+        </label>
+
+        <button type="button" class="cancelbtn">Cancel</button>
+        <span class="password">Forgot <a href="#">password?</a></span>
+    </div>
+</form>
+<script src="/js/login.js"></script>
+
+</html>
