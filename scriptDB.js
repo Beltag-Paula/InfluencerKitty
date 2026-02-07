@@ -41,8 +41,13 @@ function createUserSignIn(myEmail, myUsername, myPassword) {
     }
 }
 
+function checkUserSignIn(myEmail, myUsername) {
+    const check = db.prepare('SELECT * FROM users WHERE email=? OR username=?');
+    return !!check.get(myEmail, myUsername);
+}
+
 function checkUserLogin(myEmail, myPassword) {
-    const check = db.prepare('SELECT ID as id FROM users WHERE email=? AND password=?');
+    const check = db.prepare('SELECT ID as id,username,email FROM users WHERE email=? AND password=?');
     return check.get(myEmail, myPassword) || null;
 }
 
@@ -51,10 +56,6 @@ function getUserDetails(id) {
     return check.get(id) || null;
 }
 
-function checkUserSignIn(myEmail, myUsername, myPassword) {
-    const check = db.prepare('SELECT * FROM users WHERE email=? AND username=? AND password=?');
-    return !!check.get(myEmail, myUsername, myPassword);
-}
 
 module.exports = {
   db,

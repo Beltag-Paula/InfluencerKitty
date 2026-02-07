@@ -1,0 +1,31 @@
+<header>
+
+    <div class="menuClass">
+        <i class="fa fa-bars" aria-hidden="true"></i>
+        <ul id="menu-box">
+            <li><a href="/" class="button-class">Home</a></li>
+            <li><a href="/page/blog " class="button-class">Blog</a></li>
+            <li><a href="/page/gallery" class="button-class">Gallery</a></li>
+            <li><a href="/page/shop" class="button-class">Shop</a></li>
+            <li><a href="/page/contact" class="button-class">Contact</a></li>
+        </ul>
+    </div>
+
+    <div class="accountIcon">
+        <button class="login-btn">
+            <i class="fa fa-user-circle" style="font-size:48px" aria-hidden="true"></i>
+        </button>
+
+        <% if (isLoggedIn) { %>
+            <div class="accountButtons">
+                <a href="/page/profile" class="button-class">Profile</a>
+                <a href="/signout" class="button-class">Sign Out</a>
+            </div>
+            <% } else { %>
+            <div class="accountButtons">
+                <a href="/page/login" class="button-class">Log In</a>
+                <a href="/page/signup" class="button-class">Sign In</a>
+            </div>
+            <% } %>
+    </div>
+</header>

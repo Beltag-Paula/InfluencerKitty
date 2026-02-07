@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Influencer Kitty</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+
+
+</head>
+
+<body>
+
+    <%- include('header') -%>
+
+        <!--<form action="action_page.php">-->
+        <form onsubmit="return false;">
+            <div class="container">
+
+                <label for="firstname">First Name</label>
+                <input type="text" id="fname" name="firstname" placeholder="Your name..">
+
+                <label for="lastname">Last Name</label>
+                <input type="text" id="lname" name="lastname" placeholder="Your last name..">
+
+                <label for="country">Country</label>
+                <select id="country" name="country">
+                    <option value="albania">Albania</option>
+                    <option value="andorra">Andorra</option>
+                    <option value="austria">Austria</option>
+                    <option value="belarus">Belarus</option>
+                    <option value="belgium">Belgium</option>
+                    <option value="bosnia-and-herzegovina">Bosnia and Herzegovina</option>
+                    <option value="bulgaria">Bulgaria</option>
+                    <option value="croatia">Croatia</option>
+                    <option value="cyprus">Cyprus</option>
+                    <option value="czech-republic">Czech Republic</option>
+                    <option value="denmark">Denmark</option>
+                    <option value="estonia">Estonia</option>
+                    <option value="finland">Finland</option>
+                    <option value="france">France</option>
+                    <option value="germany">Germany</option>
+                    <option value="greece">Greece</option>
+                    <option value="hungary">Hungary</option>
+                    <option value="iceland">Iceland</option>
+                    <option value="ireland">Ireland</option>
+                    <option value="italy">Italy</option>
+                    <option value="kosovo">Kosovo</option>
+                    <option value="latvia">Latvia</option>
+                    <option value="liechtenstein">Liechtenstein</option>
+                    <option value="lithuania">Lithuania</option>
+                    <option value="luxembourg">Luxembourg</option>
+                    <option value="malta">Malta</option>
+                    <option value="moldova">Moldova</option>
+                    <option value="monaco">Monaco</option>
+                    <option value="montenegro">Montenegro</option>
+                    <option value="netherlands">Netherlands</option>
+                    <option value="north-macedonia">North Macedonia</option>
+                    <option value="norway">Norway</option>
+                    <option value="poland">Poland</option>
+                    <option value="portugal">Portugal</option>
+                    <option value="romania">Romania</option>
+                    <option value="russia">Russia</option>
+                    <option value="san-marino">San Marino</option>
+                    <option value="serbia">Serbia</option>
+                    <option value="slovakia">Slovakia</option>
+                    <option value="slovenia">Slovenia</option>
+                    <option value="spain">Spain</option>
+                    <option value="sweden">Sweden</option>
+                    <option value="switzerland">Switzerland</option>
+                    <option value="ukraine">Ukraine</option>
+                    <option value="united-kingdom">United Kingdom</option>
+                    <option value="vatican-city">Vatican City</option>
+
+                </select>
+
+                <label for="subject">Subject</label>
+                <textarea id="subject" name="subject" placeholder="Write something.." style="height:200px"></textarea>
+
+                <input type="submit" id="submitBTN" value="Submit">
+            </div>
+
+        </form>
+
+        <%- include('footer') -%>
+</body>
+
+</html>

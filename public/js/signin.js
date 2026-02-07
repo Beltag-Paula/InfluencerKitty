@@ -1,14 +1,15 @@
 async function onSubmit() {
     const email = document.getElementsByName('email')[0].value;
+    const username = document.getElementsByName('username')[0].value;
     const password = document.getElementsByName('password')[0].value;
     const remember = document.getElementsByName('remember')[0].value;
 
 
     const data = {
-        email, password, remember
+        email, username, password, remember
     };
 
-    const url = "/api/login";
+    const url = '/api/signin';
 
     try {
         const response = await fetch(url, {
@@ -18,8 +19,8 @@ async function onSubmit() {
             },
             body: JSON.stringify(data)
         });
-
         if (!response.ok) throw new Error("Response not ok");
+
         window.location.assign(await response.text());
     } catch (exception) {
         console.error(exception);
@@ -28,4 +29,4 @@ async function onSubmit() {
 }
 
 
-document.getElementById('loginBtn').addEventListener('click', onSubmit)
+document.getElementById('signupBtn').addEventListener('click', onSubmit);
