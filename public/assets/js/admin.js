@@ -12,6 +12,7 @@
 
   const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
   const fail = e => Kitty.toast(e.message, 'err');
+  const exportBtn = (what, label = 'Export CSV') => `<a class="btn btn-sm btn-ghost" href="/api/admin/export/${what}.csv" download>${label}</a>`;
   let products = [];
 
   /* ------------------------------ navigation ------------------------------ */
@@ -28,7 +29,7 @@
   async function dashboard() {
     const s = await api('/admin/stats');
     const max = Math.max(...s.days.map(d => d.totalCents), 1);
-    view.innerHTML = `<div class="page-head"><h1>Dashboard</h1></div>
+    view.innerHTML = `<div class="page-head"><h1>Dashboard</h1>${exportBtn('dashboard', 'Export summary (CSV)')}</div>
       <div class="stats">
         <div class="stat"><span>Revenue</span><strong>${money(s.revenueCents)}</strong></div>
         <div class="stat"><span>Orders</span><strong>${s.orders}</strong></div>
@@ -49,7 +50,15 @@
   /* ------------------------------ products ------------------------------ */
   async function productsView() {
     products = (await api('/products?sort=newest')).products;
-    view.innerHTML = `<div class="page-head"><h1>Products</h1><button class="btn" id="add-product">Add product</button></div>
+    view.innerHTML = `<div class="page-head"><h1>Products</h1>
+        <div class="actions">${exportBtn('products')}<button class="btn btn-sm btn-ghost" id="import-btn">Import CSV</button><input type="file" id="import-file" accept=".csv,text/csv" hidden><button class="btn" id="add-product">Add product</button></div></div>
+      <div id="import-result"></div>
+      <details class="panel sheets-help"><summary>Edit products in Google Sheets or Excel</summary>
+        <ol><li>Click <strong>Export CSV</strong> to download your products.</li>
+        <li>In Google Sheets (<a href="https://sheets.new" target="_blank" rel="noopener">open a new sheet</a>) choose <strong>File &gt; Import &gt; Upload</strong> and pick the file.</li>
+        <li>Change prices, discounts and stock, or add new rows. Leave <strong>id</strong> empty for a new product. Put several images in the <strong>images</strong> cell separated by <code>|</code>.</li>
+        <li>Choose <strong>File &gt; Download &gt; Comma-separated values (.csv)</strong>, then click <strong>Import CSV</strong> here.</li></ol>
+        <p class="hint">Rows with an existing id update that product. Nothing is ever deleted by an import. If any row has a mistake, nothing is imported and you will see which rows to fix.</p></details>
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Discount</th><th>Stock</th><th></th></tr></thead><tbody>
       ${products.map(p => `<tr data-id="${esc(p.id)}">
         <td><div class="prod-cell"><img class="thumb" src="${esc(p.images[0] || '/assets/images/logo/logo-cat.svg')}" alt=""><div><strong>${esc(p.name)}</strong>${p.featured ? '<br><span class="muted">Featured</span>' : ''}</div></div></td>
@@ -63,6 +72,7 @@
 
   view.addEventListener('click', async e => {
     if (e.target.closest('#add-product')) return openForm();
+    if (e.target.closest('#import-btn')) return $('#import-file').click();
     const row = e.target.closest('tr[data-id]');
     if (row && e.target.closest('[data-edit]')) return openForm(products.find(p => p.id === row.dataset.id));
     if (row && e.target.closest('[data-delete]')) {
@@ -140,10 +150,29 @@
     btn.disabled = false;
   });
 
+  /* ---- import products from a CSV (Google Sheets / Excel) ---- */
+  async function importCsv(input) {
+    const file = input.files[0]; input.value = '';
+    if (!file) return;
+    if (file.size > 2.5 * 1024 * 1024) return Kitty.toast('That file is too big (max 2.5 MB).', 'err');
+    if (!confirm(`Import "${file.name}"?\nRows with an existing id will overwrite those products. New rows are added.`)) return;
+    const box = $('#import-result');
+    try {
+      const csv = await file.text();
+      const r = await api('/admin/import/products', { method: 'POST', body: { csv } });
+      if (r.errors.length) {
+        box.innerHTML = `<div class="form-error"><strong>Nothing was imported.</strong> Please fix these rows in your sheet and try again:<ul>${r.errors.map(x => `<li>Row ${x.row}: ${esc(x.message)}</li>`).join('')}</ul>${r.moreErrors ? `<p>...and ${r.moreErrors} more.</p>` : ''}</div>`;
+        return;
+      }
+      Kitty.toast(`Imported: ${r.created} added, ${r.updated} updated`);
+      go('products');
+    } catch (err) { box.innerHTML = `<div class="form-error">${esc(err.message)}</div>`; }
+  }
+
   /* ------------------------------ orders ------------------------------ */
   async function orders() {
     const list = (await api('/admin/orders')).orders;
-    view.innerHTML = `<div class="page-head"><h1>Orders</h1></div>
+    view.innerHTML = `<div class="page-head"><h1>Orders</h1>${exportBtn('orders')}</div>
       <div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Payment</th><th>Total</th><th>Status</th></tr></thead><tbody>
       ${list.map(o => `<tr>
         <td><button class="link-btn" style="color:var(--ink)" data-toggle-order="${esc(o.id)}"><strong>${esc(o.number)}</strong> (details)</button></td>
@@ -159,6 +188,7 @@
       </tbody></table></div>`;
   }
   view.addEventListener('change', async e => {
+    if (e.target.id === 'import-file') return importCsv(e.target);
     const sel = e.target.closest('[data-order]');
     if (!sel) return;
     try { await api('/admin/orders/' + sel.dataset.order, { method: 'PUT', body: { status: sel.value } }); Kitty.toast('Order updated'); go('orders'); }
@@ -168,7 +198,7 @@
   /* ------------------------------ customers ------------------------------ */
   async function customers() {
     const list = (await api('/admin/users')).users;
-    view.innerHTML = `<div class="page-head"><h1>Customers</h1></div>
+    view.innerHTML = `<div class="page-head"><h1>Customers</h1>${exportBtn('customers')}</div>
       <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Orders</th></tr></thead><tbody>
       ${list.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td>${dateStr(u.createdAt)}</td><td>${u.orders}</td></tr>`).join('')}
       </tbody></table></div>`;

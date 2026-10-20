@@ -1,14 +1,9 @@
 {
   "name": "kitty-ecommerce",
   "version": "1.0.0",
-  "description": "Kitty Ecommerce - a cat shop with accounts, cart, checkout UI and an admin dashboard (vanilla HTML/CSS/JS + dependency-free Node backend).",
+  "description": "Kitty Ecommerce - a cat shop with accounts, cart, checkout UI and an admin dashboard (vanilla HTML/CSS/JS + dependency-free Node backend with SQLite).",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=22.13" },
   "license": "MIT"
 }

@@ -1,19 +1,26 @@
 'use strict';
 /**
  * Kitty Ecommerce - backend
- * Zero dependencies: only Node's built-in modules. Run with:  node server.js
- * Data is stored in data/db.json (created and seeded on first start).
+ * Zero dependencies: only Node's built-in modules (needs Node 22.13 or newer for node:sqlite).
+ * Run with:  node server.js
+ * Data lives in data/kitty.db (SQLite). It is created and seeded on first start.
  */
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
+// node:sqlite still prints an "experimental" notice; hide only that one line.
+const emitWarning = process.emitWarning;
+process.emitWarning = (w, ...a) => (String(w && w.message || w).includes('SQLite') ? undefined : emitWarning.call(process, w, ...a));
+const { DatabaseSync } = require('node:sqlite');
+
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const UPLOADS = path.join(PUBLIC, 'uploads');
 const DATA_DIR = path.join(__dirname, 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
+const DB_FILE = path.join(DATA_DIR, 'kitty.db');
+const OLD_JSON = path.join(DATA_DIR, 'db.json'); // from the first version of the shop
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true'; // set to true when served over HTTPS
 const SESSION_DAYS = 7;
 
@@ -22,17 +29,47 @@ const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancel
 const PAYMENT_METHODS = ['card', 'paypal', 'cod'];
 
 /* ------------------------------------------------------------------ */
-/* Tiny JSON database                                                  */
+/* Database (SQLite)                                                   */
 /* ------------------------------------------------------------------ */
-let db;
+fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(UPLOADS, { recursive: true });
+const db = new DatabaseSync(DB_FILE);
+db.exec(`
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')), created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+  price_cents INTEGER NOT NULL CHECK (price_cents > 0),
+  discount_percent INTEGER NOT NULL DEFAULT 0 CHECK (discount_percent BETWEEN 0 AND 90),
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  images TEXT NOT NULL DEFAULT '[]', rating REAL NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE TABLE IF NOT EXISTS cart_items (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL CHECK (qty > 0), PRIMARY KEY (user_id, product_id));
+CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY, number TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL, user_name TEXT NOT NULL, user_email TEXT NOT NULL,
+  items TEXT NOT NULL, subtotal_cents INTEGER NOT NULL, shipping_cents INTEGER NOT NULL, total_cents INTEGER NOT NULL,
+  shipping TEXT NOT NULL, payment_method TEXT NOT NULL, payment_status TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+INSERT OR IGNORE INTO meta (key, value) VALUES ('orderSeq', '1000');
+`);
+
+// run several statements all-or-nothing
+function tx(fn) {
+  db.exec('BEGIN IMMEDIATE');
+  try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; }
+}
+const q = sql => db.prepare(sql);
 const uid = () => crypto.randomBytes(6).toString('hex');
 const now = () => new Date().toISOString();
-
-function saveDb() {
-  const tmp = DB_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
-  fs.renameSync(tmp, DB_FILE); // atomic replace so a crash can't corrupt the file
-}
 
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16);
@@ -47,10 +84,40 @@ function verifyPassword(pw, stored) {
   return known.length === hash.length && crypto.timingSafeEqual(hash, known);
 }
 
+/* ---- row <-> object converters ---- */
+const toProduct = r => r && ({
+  id: r.id, name: r.name, description: r.description, category: r.category,
+  priceCents: r.price_cents, discountPercent: r.discount_percent, finalCents: finalCents(r.price_cents, r.discount_percent),
+  stock: r.stock, images: JSON.parse(r.images), rating: r.rating, featured: !!r.featured, createdAt: r.created_at
+});
+const toOrder = r => r && ({
+  id: r.id, number: r.number, userId: r.user_id, userName: r.user_name, userEmail: r.user_email, items: JSON.parse(r.items),
+  subtotalCents: r.subtotal_cents, shippingCents: r.shipping_cents, totalCents: r.total_cents, shipping: JSON.parse(r.shipping),
+  paymentMethod: r.payment_method, paymentStatus: r.payment_status, status: r.status, createdAt: r.created_at
+});
+const toUser = r => r && ({ id: r.id, name: r.name, email: r.email, role: r.role, createdAt: r.created_at });
+function finalCents(priceCents, discountPercent) { return Math.round(priceCents * (100 - (discountPercent || 0)) / 100); }
+const shippingFor = subtotal => (subtotal === 0 || subtotal >= CONFIG.freeShippingOverCents ? 0 : CONFIG.shippingCents);
+
+function insertProduct(p, extra = {}) {
+  const id = extra.id || uid();
+  q(`INSERT INTO products (id, name, category, description, price_cents, discount_percent, stock, images, rating, featured, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(id, p.name, p.category, p.description, p.priceCents, p.discountPercent, p.stock,
+    JSON.stringify(p.images), extra.rating || 0, p.featured ? 1 : 0, extra.createdAt || now());
+  return id;
+}
+function updateProduct(id, p) {
+  q(`UPDATE products SET name=?, category=?, description=?, price_cents=?, discount_percent=?, stock=?, images=?, featured=? WHERE id=?`)
+    .run(p.name, p.category, p.description, p.priceCents, p.discountPercent, p.stock, JSON.stringify(p.images), p.featured ? 1 : 0, id);
+}
+const getProduct = id => toProduct(q('SELECT * FROM products WHERE id = ?').get(id));
+
+/* ---- first start: seed sample data, or migrate the old db.json ---- */
 function seed() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@kitty.local').toLowerCase();
   const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
-  db.users.push({ id: uid(), name: 'Shop Admin', email: adminEmail, passwordHash: hashPassword(adminPass), role: 'admin', createdAt: now() });
+  q('INSERT INTO users (id,name,email,password_hash,role,created_at) VALUES (?,?,?,?,?,?)')
+    .run(uid(), 'Shop Admin', adminEmail, hashPassword(adminPass), 'admin', now());
   const img = n => `/assets/images/products/${n}.svg`;
   const items = [
     ['Crunchy Bites Dry Cat Food 2kg', 'Food', 1899, 15, 40, 'dry-food', 4.8, true, 'Complete crunchy kibble with chicken and salmon. Supports healthy digestion and a shiny coat.'],
@@ -68,23 +135,31 @@ function seed() {
     ['Safety Collar with Bell', 'Collars & Travel', 849, 0, 100, 'collar', 4.5, false, 'Adjustable collar with a quick-release safety buckle and a bell.'],
     ['Soft-Sided Cat Carrier', 'Collars & Travel', 4499, 10, 20, 'carrier', 4.7, true, 'Ventilated carrier with a secure front door, top handle and padded base.']
   ];
-  items.forEach(([name, category, priceCents, discountPercent, stock, image, rating, featured, description], i) => {
-    db.products.push({ id: uid(), name, category, description, priceCents, discountPercent, stock, images: [img(image)], rating, featured, createdAt: new Date(Date.now() - i * 3600e3).toISOString() });
-  });
+  tx(() => items.forEach(([name, category, priceCents, discountPercent, stock, image, rating, featured, description], i) =>
+    insertProduct({ name, category, description, priceCents, discountPercent, stock, images: [img(image)], featured },
+      { rating, createdAt: new Date(Date.now() - i * 3600e3).toISOString() })));
+  console.log('Created data/kitty.db with sample products.');
+  console.log(`Admin login: ${adminEmail} / ${adminPass}  (change this - see README)`);
 }
 
-function loadDb() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.mkdirSync(UPLOADS, { recursive: true });
-  if (fs.existsSync(DB_FILE)) {
-    db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    return;
-  }
-  db = { users: [], products: [], orders: [], carts: {}, sessions: [], orderSeq: 1000 };
-  seed();
-  saveDb();
-  console.log('Created data/db.json with sample products.');
-  console.log(`Admin login: ${db.users[0].email} / ${process.env.ADMIN_PASSWORD || 'admin123'}  (change this - see README)`);
+function migrateJson() {
+  const old = JSON.parse(fs.readFileSync(OLD_JSON, 'utf8'));
+  tx(() => {
+    for (const u of old.users || []) q('INSERT OR IGNORE INTO users (id,name,email,password_hash,role,created_at) VALUES (?,?,?,?,?,?)').run(u.id, u.name, u.email, u.passwordHash, u.role, u.createdAt);
+    for (const p of old.products || []) q(`INSERT OR IGNORE INTO products (id,name,category,description,price_cents,discount_percent,stock,images,rating,featured,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(p.id, p.name, p.category, p.description || '', p.priceCents, p.discountPercent || 0, p.stock, JSON.stringify(p.images || []), p.rating || 0, p.featured ? 1 : 0, p.createdAt);
+    for (const o of old.orders || []) q(`INSERT OR IGNORE INTO orders (id,number,user_id,user_name,user_email,items,subtotal_cents,shipping_cents,total_cents,shipping,payment_method,payment_status,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(o.id, o.number, o.userId, o.userName, o.userEmail, JSON.stringify(o.items), o.subtotalCents, o.shippingCents, o.totalCents, JSON.stringify(o.shipping), o.paymentMethod, o.paymentStatus, o.status, o.createdAt);
+    for (const [userId, items] of Object.entries(old.carts || {})) for (const i of items)
+      if (getProduct(i.productId)) q('INSERT OR IGNORE INTO cart_items (user_id,product_id,qty) VALUES (?,?,?)').run(userId, i.productId, i.qty);
+    q("UPDATE meta SET value = ? WHERE key = 'orderSeq'").run(String(old.orderSeq || 1000));
+  });
+  fs.renameSync(OLD_JSON, OLD_JSON + '.migrated');
+  console.log('Moved your data from data/db.json into data/kitty.db (old file kept as db.json.migrated).');
+}
+
+if (q('SELECT COUNT(*) AS n FROM users').get().n === 0) {
+  if (fs.existsSync(OLD_JSON)) migrateJson(); else seed();
 }
 
 /* ------------------------------------------------------------------ */
@@ -92,11 +167,6 @@ function loadDb() {
 /* ------------------------------------------------------------------ */
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const bad = (msg, status = 400) => new HttpError(status, msg);
-
-const finalCents = p => Math.round(p.priceCents * (100 - (p.discountPercent || 0)) / 100);
-const publicProduct = p => ({ id: p.id, name: p.name, description: p.description, category: p.category, priceCents: p.priceCents, discountPercent: p.discountPercent || 0, finalCents: finalCents(p), stock: p.stock, images: p.images, rating: p.rating || 0, featured: !!p.featured, createdAt: p.createdAt });
-const publicUser = u => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt });
-const shippingFor = subtotal => (subtotal === 0 || subtotal >= CONFIG.freeShippingOverCents ? 0 : CONFIG.shippingCents);
 
 function cleanStr(v, max, { required = false, field = 'Field' } = {}) {
   const s = typeof v === 'string' ? v.trim().replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '') : '';
@@ -119,16 +189,13 @@ const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 function getUser(req) {
   const token = parseCookies(req).kitty_sid;
   if (!token) return null;
-  const h = sha(token);
-  const s = db.sessions.find(x => x.tokenHash === h);
-  if (!s || s.expires < Date.now()) return null;
-  return db.users.find(u => u.id === s.userId) || null;
+  const row = q(`SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires > ?`).get(sha(token), Date.now());
+  return row || null;
 }
-function startSession(res, user) {
-  db.sessions = db.sessions.filter(s => s.expires > Date.now());
+function startSession(res, userId) {
+  q('DELETE FROM sessions WHERE expires < ?').run(Date.now());
   const token = crypto.randomBytes(32).toString('hex');
-  db.sessions.push({ tokenHash: sha(token), userId: user.id, expires: Date.now() + SESSION_DAYS * 864e5 });
-  saveDb();
+  q('INSERT INTO sessions (token_hash, user_id, expires) VALUES (?,?,?)').run(sha(token), userId, Date.now() + SESSION_DAYS * 864e5);
   res.setHeader('Set-Cookie', `kitty_sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}${COOKIE_SECURE ? '; Secure' : ''}`);
 }
 
@@ -161,10 +228,43 @@ function readBody(req, limit) {
 }
 
 function send(res, status, data, headers = {}) {
-  const body = JSON.stringify(data);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
-  res.end(body);
+  res.end(JSON.stringify(data));
 }
+
+/* ---------------- CSV (for Google Sheets / Excel) ---------------- */
+// Cells that start with = + - @ can run as formulas when the file is opened in a spreadsheet, so text cells get a leading '.
+function csvCell(v) {
+  let s = v == null ? '' : String(v);
+  if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+const toCsv = (headers, rows) => '\uFEFF' + [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const firstLine = text.split(/\r?\n/, 1)[0] || '';
+  const delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ','; // Excel in some countries uses ;
+  const rows = []; let row = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; } else cell += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+const unQuote = s => String(s).replace(/^'(?=[=+\-@])/, ''); // undo the protective ' added on export
+
+function sendCsv(res, filename, headers, rows) {
+  res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  res.end(toCsv(headers, rows));
+}
+const dollars = cents => (cents / 100).toFixed(2);
 
 /* ------------------------------------------------------------------ */
 /* Routes                                                              */
@@ -187,88 +287,89 @@ route('POST', '/api/auth/signup', ({ body, res, ip }) => {
   const password = typeof body.password === 'string' ? body.password : '';
   if (!isEmail(email)) throw bad('Please enter a valid email address.');
   if (password.length < 8 || password.length > 100) throw bad('Password must be 8 to 100 characters.');
-  if (db.users.some(u => u.email === email)) throw bad('An account with this email already exists.', 409);
-  const user = { id: uid(), name, email, passwordHash: hashPassword(password), role: 'customer', createdAt: now() };
-  db.users.push(user);
-  startSession(res, user);
-  return { user: publicUser(user) };
+  if (q('SELECT 1 FROM users WHERE email = ?').get(email)) throw bad('An account with this email already exists.', 409);
+  const id = uid();
+  q('INSERT INTO users (id,name,email,password_hash,role,created_at) VALUES (?,?,?,?,?,?)').run(id, name, email, hashPassword(password), 'customer', now());
+  startSession(res, id);
+  return { user: toUser(q('SELECT * FROM users WHERE id = ?').get(id)) };
 });
 
 route('POST', '/api/auth/login', ({ body, res, ip }) => {
   checkRate(ip);
   const email = cleanStr(body.email, 200).toLowerCase();
-  const user = db.users.find(u => u.email === email);
-  const ok = user && verifyPassword(typeof body.password === 'string' ? body.password : '', user.passwordHash);
+  const user = q('SELECT * FROM users WHERE email = ?').get(email);
+  const ok = user && verifyPassword(typeof body.password === 'string' ? body.password : '', user.password_hash);
   if (!ok) { noteFail(ip); throw bad('Wrong email or password.', 401); }
-  startSession(res, user);
-  return { user: publicUser(user) };
+  startSession(res, user.id);
+  return { user: toUser(user) };
 });
 
 route('POST', '/api/auth/logout', ({ req, res }) => {
   const token = parseCookies(req).kitty_sid;
-  if (token) { const h = sha(token); db.sessions = db.sessions.filter(s => s.tokenHash !== h); saveDb(); }
+  if (token) q('DELETE FROM sessions WHERE token_hash = ?').run(sha(token));
   res.setHeader('Set-Cookie', 'kitty_sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
   return { ok: true };
 });
 
-route('GET', '/api/auth/me', ({ user }) => ({ user: user ? publicUser(user) : null }));
+route('GET', '/api/auth/me', ({ user }) => ({ user: user || null }));
 
 /* ---- products (public) ---- */
+const SORTS = {
+  newest: 'created_at DESC',
+  'price-asc': 'ROUND(price_cents * (100 - discount_percent) / 100.0) ASC',
+  'price-desc': 'ROUND(price_cents * (100 - discount_percent) / 100.0) DESC',
+  discount: 'discount_percent DESC, created_at DESC',
+  rating: 'rating DESC, created_at DESC'
+};
 route('GET', '/api/products', ({ query }) => {
-  let list = db.products.slice();
-  if (query.ids) { const ids = query.ids.split(',').slice(0, 100); list = list.filter(p => ids.includes(p.id)); }
-  if (query.category) list = list.filter(p => p.category === query.category);
-  if (query.q) { const q = query.q.toLowerCase(); list = list.filter(p => (p.name + ' ' + p.category + ' ' + p.description).toLowerCase().includes(q)); }
-  if (query.sale === '1') list = list.filter(p => p.discountPercent > 0);
-  if (query.featured === '1') list = list.filter(p => p.featured);
-  const sorters = {
-    newest: (a, b) => b.createdAt.localeCompare(a.createdAt),
-    'price-asc': (a, b) => finalCents(a) - finalCents(b),
-    'price-desc': (a, b) => finalCents(b) - finalCents(a),
-    discount: (a, b) => b.discountPercent - a.discountPercent,
-    rating: (a, b) => b.rating - a.rating
-  };
-  list.sort(sorters[query.sort] || sorters.newest);
-  return { products: list.map(publicProduct) };
+  const where = [], args = [];
+  if (query.ids) { const ids = query.ids.split(',').slice(0, 100); where.push(`id IN (${ids.map(() => '?').join(',')})`); args.push(...ids); }
+  if (query.category) { where.push('category = ?'); args.push(query.category); }
+  if (query.q) { where.push(`(name || ' ' || category || ' ' || description) LIKE ? ESCAPE '\\'`); args.push('%' + query.q.replace(/[\\%_]/g, '\\$&') + '%'); }
+  if (query.sale === '1') where.push('discount_percent > 0');
+  if (query.featured === '1') where.push('featured = 1');
+  const sql = `SELECT * FROM products ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY ${SORTS[query.sort] || SORTS.newest}`;
+  return { products: q(sql).all(...args).map(toProduct) };
 });
 
 route('GET', '/api/products/:id', ({ params }) => {
-  const p = db.products.find(x => x.id === params.id);
+  const p = getProduct(params.id);
   if (!p) throw bad('Product not found.', 404);
-  return { product: publicProduct(p) };
+  return { product: p };
 });
 
 route('GET', '/api/categories', () => {
-  const map = new Map();
-  for (const p of db.products) {
-    const c = map.get(p.category) || { name: p.category, count: 0, image: p.images[0] || '' };
-    c.count++; map.set(p.category, c);
-  }
-  return { categories: [...map.values()] };
+  const rows = q('SELECT category, COUNT(*) AS n, MIN(created_at) AS first FROM products GROUP BY category ORDER BY first').all();
+  return {
+    categories: rows.map(r => {
+      const p = q('SELECT images FROM products WHERE category = ? ORDER BY created_at LIMIT 1').get(r.category);
+      return { name: r.category, count: r.n, image: JSON.parse(p.images)[0] || '' };
+    })
+  };
 });
 
 /* ---- cart (logged-in users; guests keep theirs in localStorage) ---- */
-route('GET', '/api/cart', { auth: 'user' }, ({ user }) => ({ items: (db.carts[user.id] || []).filter(i => db.products.some(p => p.id === i.productId)) }));
+route('GET', '/api/cart', { auth: 'user' }, ({ user }) => ({
+  items: q('SELECT product_id, qty FROM cart_items WHERE user_id = ?').all(user.id).map(r => ({ productId: r.product_id, qty: r.qty }))
+}));
 route('PUT', '/api/cart', { auth: 'user' }, ({ user, body }) => {
   if (!Array.isArray(body.items) || body.items.length > 100) throw bad('Invalid cart.');
   const items = [];
-  for (const i of body.items) {
-    const p = db.products.find(x => x.id === i.productId);
-    const qty = Math.floor(Number(i.qty));
-    if (!p || !(qty >= 1)) continue;
-    items.push({ productId: p.id, qty: Math.min(qty, 99, Math.max(p.stock, 1)) });
-  }
-  db.carts[user.id] = items;
-  saveDb();
+  tx(() => {
+    q('DELETE FROM cart_items WHERE user_id = ?').run(user.id);
+    for (const i of body.items) {
+      const p = q('SELECT id, stock FROM products WHERE id = ?').get(String(i.productId));
+      const qty = Math.floor(Number(i.qty));
+      if (!p || !(qty >= 1) || items.some(x => x.productId === p.id)) continue;
+      const capped = Math.min(qty, 99, Math.max(p.stock, 1));
+      q('INSERT INTO cart_items (user_id, product_id, qty) VALUES (?,?,?)').run(user.id, p.id, capped);
+      items.push({ productId: p.id, qty: capped });
+    }
+  });
   return { items };
 });
 
 /* ---- orders ---- */
-function validatePayment(body) {
-  if (!PAYMENT_METHODS.includes(body.paymentMethod)) throw bad('Please choose a payment method.');
-  return body.paymentMethod;
-}
-
 route('POST', '/api/orders', { auth: 'user' }, ({ user, body }) => {
   const s = body.shipping || {};
   const shipping = {
@@ -279,39 +380,44 @@ route('POST', '/api/orders', { auth: 'user' }, ({ user, body }) => {
     zip: cleanStr(s.zip, 20, { required: true, field: 'Postal code' }),
     country: cleanStr(s.country, 60, { required: true, field: 'Country' })
   };
-  const paymentMethod = validatePayment(body);
-  const cart = db.carts[user.id] || [];
-  if (!cart.length) throw bad('Your cart is empty.');
+  if (!PAYMENT_METHODS.includes(body.paymentMethod)) throw bad('Please choose a payment method.');
+  const paymentMethod = body.paymentMethod;
 
-  // Prices and stock are always re-checked on the server.
-  const lines = [];
-  for (const i of cart) {
-    const p = db.products.find(x => x.id === i.productId);
-    if (!p) throw bad('A product in your cart is no longer available. Please review your cart.');
-    if (p.stock < i.qty) throw bad(`Only ${p.stock} left of "${p.name}". Please update your cart.`, 409);
-    lines.push({ p, qty: i.qty });
-  }
-  const items = lines.map(({ p, qty }) => ({ productId: p.id, name: p.name, image: p.images[0] || '', unitCents: finalCents(p), qty }));
-  const subtotalCents = items.reduce((t, i) => t + i.unitCents * i.qty, 0);
-  const shippingCents = shippingFor(subtotalCents);
-  lines.forEach(({ p, qty }) => { p.stock -= qty; });
-
-  const order = {
-    id: uid(), number: 'KT-' + (++db.orderSeq), userId: user.id, userName: user.name, userEmail: user.email,
-    items, subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents, shipping, paymentMethod,
-    // Demo only: no real payment is processed. Card/PayPal are marked "paid (demo)".
-    paymentStatus: paymentMethod === 'cod' ? 'pay on delivery' : 'paid (demo)',
-    status: 'pending', createdAt: now()
-  };
-  db.orders.push(order);
-  db.carts[user.id] = [];
-  saveDb();
+  // Everything below happens in one transaction: if anything fails, nothing is saved.
+  const order = tx(() => {
+    const cart = q('SELECT product_id, qty FROM cart_items WHERE user_id = ?').all(user.id);
+    if (!cart.length) throw bad('Your cart is empty.');
+    const items = [];
+    for (const c of cart) {
+      const p = getProduct(c.product_id); // prices are always re-read from the database
+      if (!p) throw bad('A product in your cart is no longer available. Please review your cart.');
+      const upd = q('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?').run(c.qty, p.id, c.qty);
+      if (!upd.changes) throw bad(`Only ${p.stock} left of "${p.name}". Please update your cart.`, 409);
+      items.push({ productId: p.id, name: p.name, image: p.images[0] || '', unitCents: p.finalCents, qty: c.qty });
+    }
+    const subtotalCents = items.reduce((t, i) => t + i.unitCents * i.qty, 0);
+    const shippingCents = shippingFor(subtotalCents);
+    q("UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'orderSeq'").run();
+    const number = 'KT-' + q("SELECT value FROM meta WHERE key = 'orderSeq'").get().value;
+    const o = {
+      id: uid(), number, user_id: user.id, user_name: user.name, user_email: user.email, items: JSON.stringify(items),
+      subtotal_cents: subtotalCents, shipping_cents: shippingCents, total_cents: subtotalCents + shippingCents, shipping: JSON.stringify(shipping),
+      payment_method: paymentMethod,
+      // Demo only: no real payment is processed. Card/PayPal are marked "paid (demo)".
+      payment_status: paymentMethod === 'cod' ? 'pay on delivery' : 'paid (demo)', status: 'pending', created_at: now()
+    };
+    q(`INSERT INTO orders VALUES (:id,:number,:user_id,:user_name,:user_email,:items,:subtotal_cents,:shipping_cents,:total_cents,:shipping,:payment_method,:payment_status,:status,:created_at)`).run(o);
+    q('DELETE FROM cart_items WHERE user_id = ?').run(user.id);
+    return toOrder(o);
+  });
   return { order };
 });
 
-route('GET', '/api/orders', { auth: 'user' }, ({ user }) => ({ orders: db.orders.filter(o => o.userId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+route('GET', '/api/orders', { auth: 'user' }, ({ user }) => ({
+  orders: q('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(user.id).map(toOrder)
+}));
 
-/* ---- admin ---- */
+/* ---- admin: products ---- */
 function parseProduct(b) {
   const name = cleanStr(b.name, 120, { required: true, field: 'Name' });
   const category = cleanStr(b.category, 40, { required: true, field: 'Category' });
@@ -325,46 +431,41 @@ function parseProduct(b) {
   return { name, category, description, priceCents, discountPercent, stock, images, featured: !!b.featured };
 }
 
-route('GET', '/api/admin/stats', { auth: 'admin' }, () => {
-  const live = db.orders.filter(o => o.status !== 'cancelled');
-  const days = [];
-  for (let d = 6; d >= 0; d--) {
-    const day = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
-    days.push({ day, totalCents: live.filter(o => o.createdAt.startsWith(day)).reduce((t, o) => t + o.totalCents, 0) });
-  }
-  return {
-    revenueCents: live.reduce((t, o) => t + o.totalCents, 0),
-    orders: db.orders.length,
-    pendingOrders: db.orders.filter(o => o.status === 'pending').length,
-    products: db.products.length,
-    customers: db.users.filter(u => u.role === 'customer').length,
-    lowStock: db.products.filter(p => p.stock <= 5).map(publicProduct),
-    recentOrders: db.orders.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
-    days
-  };
-});
-
-route('POST', '/api/admin/products', { auth: 'admin' }, ({ body }) => {
-  const p = { id: uid(), rating: 0, createdAt: now(), ...parseProduct(body) };
-  db.products.push(p); saveDb();
-  return { product: publicProduct(p) };
-});
+route('POST', '/api/admin/products', { auth: 'admin' }, ({ body }) => ({ product: getProduct(insertProduct(parseProduct(body))) }));
 route('PUT', '/api/admin/products/:id', { auth: 'admin' }, ({ params, body }) => {
-  const p = db.products.find(x => x.id === params.id);
-  if (!p) throw bad('Product not found.', 404);
-  Object.assign(p, parseProduct(body)); saveDb();
-  return { product: publicProduct(p) };
+  if (!getProduct(params.id)) throw bad('Product not found.', 404);
+  updateProduct(params.id, parseProduct(body));
+  return { product: getProduct(params.id) };
 });
 route('DELETE', '/api/admin/products/:id', { auth: 'admin' }, ({ params }) => {
-  const i = db.products.findIndex(x => x.id === params.id);
-  if (i < 0) throw bad('Product not found.', 404);
-  const [gone] = db.products.splice(i, 1);
-  // remove the image files we uploaded for it
-  gone.images.filter(u => u.startsWith('/uploads/')).forEach(u => fs.unlink(path.join(UPLOADS, path.basename(u)), () => {}));
-  saveDb();
+  const p = getProduct(params.id);
+  if (!p) throw bad('Product not found.', 404);
+  q('DELETE FROM products WHERE id = ?').run(params.id); // also removes it from carts
+  p.images.filter(u => u.startsWith('/uploads/')).forEach(u => fs.unlink(path.join(UPLOADS, path.basename(u)), () => {}));
   return { ok: true };
 });
 
+/* ---- admin: stats ---- */
+route('GET', '/api/admin/stats', { auth: 'admin' }, () => adminStats());
+function adminStats() {
+  const days = [];
+  for (let d = 6; d >= 0; d--) {
+    const day = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+    days.push({ day, totalCents: q("SELECT COALESCE(SUM(total_cents),0) AS t FROM orders WHERE status != 'cancelled' AND created_at LIKE ?").get(day + '%').t });
+  }
+  return {
+    revenueCents: q("SELECT COALESCE(SUM(total_cents),0) AS t FROM orders WHERE status != 'cancelled'").get().t,
+    orders: q('SELECT COUNT(*) AS n FROM orders').get().n,
+    pendingOrders: q("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'").get().n,
+    products: q('SELECT COUNT(*) AS n FROM products').get().n,
+    customers: q("SELECT COUNT(*) AS n FROM users WHERE role = 'customer'").get().n,
+    lowStock: q('SELECT * FROM products WHERE stock <= 5 ORDER BY stock').all().map(toProduct),
+    recentOrders: q('SELECT * FROM orders ORDER BY created_at DESC LIMIT 5').all().map(toOrder),
+    days
+  };
+}
+
+/* ---- admin: uploads ---- */
 const MAGIC = [['png', b => b.slice(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))], ['jpg', b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff], ['gif', b => b.slice(0, 4).toString() === 'GIF8'], ['webp', b => b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP']];
 route('POST', '/api/admin/upload', { auth: 'admin', bodyLimit: 6 * 1024 * 1024 }, ({ body }) => {
   const m = /^data:image\/(?:png|jpe?g|gif|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.data || ''));
@@ -378,25 +479,97 @@ route('POST', '/api/admin/upload', { auth: 'admin', bodyLimit: 6 * 1024 * 1024 }
   return { url: '/uploads/' + file };
 });
 
-route('GET', '/api/admin/orders', { auth: 'admin' }, () => ({ orders: db.orders.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }));
+/* ---- admin: orders + customers ---- */
+route('GET', '/api/admin/orders', { auth: 'admin' }, () => ({ orders: q('SELECT * FROM orders ORDER BY created_at DESC').all().map(toOrder) }));
 route('PUT', '/api/admin/orders/:id', { auth: 'admin' }, ({ params, body }) => {
-  const o = db.orders.find(x => x.id === params.id);
-  if (!o) throw bad('Order not found.', 404);
   if (!ORDER_STATUSES.includes(body.status)) throw bad('Unknown status.');
-  if (body.status === 'cancelled' && o.status !== 'cancelled') {
-    o.items.forEach(i => { const p = db.products.find(x => x.id === i.productId); if (p) p.stock += i.qty; }); // put stock back
-  } else if (o.status === 'cancelled' && body.status !== 'cancelled') {
-    for (const i of o.items) { const p = db.products.find(x => x.id === i.productId); if (p && p.stock < i.qty) throw bad(`Not enough stock of "${i.name}" to re-open this order.`, 409); }
-    o.items.forEach(i => { const p = db.products.find(x => x.id === i.productId); if (p) p.stock -= i.qty; });
-  }
-  o.status = body.status;
-  if (body.status === 'delivered' && o.paymentMethod === 'cod') o.paymentStatus = 'paid';
-  saveDb();
-  return { order: o };
+  tx(() => {
+    const o = toOrder(q('SELECT * FROM orders WHERE id = ?').get(params.id));
+    if (!o) throw bad('Order not found.', 404);
+    if (body.status === 'cancelled' && o.status !== 'cancelled') {
+      o.items.forEach(i => q('UPDATE products SET stock = stock + ? WHERE id = ?').run(i.qty, i.productId)); // put stock back
+    } else if (o.status === 'cancelled' && body.status !== 'cancelled') {
+      for (const i of o.items) {
+        const r = q('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?').run(i.qty, i.productId, i.qty);
+        if (!r.changes && q('SELECT 1 FROM products WHERE id = ?').get(i.productId)) throw bad(`Not enough stock of "${i.name}" to re-open this order.`, 409);
+      }
+    }
+    const paymentStatus = body.status === 'delivered' && o.paymentMethod === 'cod' ? 'paid' : o.paymentStatus;
+    q('UPDATE orders SET status = ?, payment_status = ? WHERE id = ?').run(body.status, paymentStatus, o.id);
+  });
+  return { order: toOrder(q('SELECT * FROM orders WHERE id = ?').get(params.id)) };
 });
 route('GET', '/api/admin/users', { auth: 'admin' }, () => ({
-  users: db.users.map(u => ({ ...publicUser(u), orders: db.orders.filter(o => o.userId === u.id).length }))
+  users: q('SELECT u.*, (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) AS orders FROM users u ORDER BY created_at').all().map(r => ({ ...toUser(r), orders: r.orders }))
 }));
+
+/* ---- admin: CSV export (open in Google Sheets or Excel) ---- */
+const PRODUCT_COLUMNS = ['id', 'name', 'category', 'description', 'price', 'discount_percent', 'stock', 'featured', 'images'];
+route('GET', '/api/admin/export/:what', { auth: 'admin' }, ({ params, res }) => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (params.what === 'products.csv') {
+    const rows = q('SELECT * FROM products ORDER BY created_at DESC').all().map(toProduct)
+      .map(p => [p.id, p.name, p.category, p.description, dollars(p.priceCents), p.discountPercent, p.stock, p.featured ? 'yes' : 'no', p.images.join(' | ')]);
+    return sendCsv(res, `kitty-products-${stamp}.csv`, PRODUCT_COLUMNS, rows);
+  }
+  if (params.what === 'orders.csv') {
+    const rows = q('SELECT * FROM orders ORDER BY created_at DESC').all().map(toOrder).map(o => [
+      o.number, o.createdAt, o.status, o.userName, o.userEmail, o.items.map(i => `${i.name} x${i.qty}`).join('; '),
+      dollars(o.subtotalCents), dollars(o.shippingCents), dollars(o.totalCents), o.paymentMethod, o.paymentStatus,
+      o.shipping.fullName, o.shipping.phone, o.shipping.address, o.shipping.city, o.shipping.zip, o.shipping.country]);
+    return sendCsv(res, `kitty-orders-${stamp}.csv`, ['order', 'date', 'status', 'customer', 'email', 'items', 'subtotal', 'shipping', 'total', 'payment_method', 'payment_status', 'ship_to', 'phone', 'address', 'city', 'postal_code', 'country'], rows);
+  }
+  if (params.what === 'customers.csv') {
+    const rows = q('SELECT u.*, (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) AS n, (SELECT COALESCE(SUM(total_cents),0) FROM orders o WHERE o.user_id = u.id AND o.status != \'cancelled\') AS spent FROM users u ORDER BY created_at').all()
+      .map(r => [r.name, r.email, r.role, r.created_at, r.n, dollars(r.spent)]);
+    return sendCsv(res, `kitty-customers-${stamp}.csv`, ['name', 'email', 'role', 'joined', 'orders', 'total_spent'], rows);
+  }
+  if (params.what === 'dashboard.csv') {
+    const s = adminStats();
+    const rows = [['Summary', 'Revenue (not cancelled)', dollars(s.revenueCents)], ['Summary', 'Orders', s.orders], ['Summary', 'Orders waiting to process', s.pendingOrders],
+      ['Summary', 'Products', s.products], ['Summary', 'Customers', s.customers],
+      ...s.days.map(d => ['Sales by day', d.day, dollars(d.totalCents)]),
+      ...s.lowStock.map(p => ['Low stock', p.name, p.stock])];
+    return sendCsv(res, `kitty-dashboard-${stamp}.csv`, ['section', 'label', 'value'], rows);
+  }
+  throw bad('Unknown export.', 404);
+});
+
+/* ---- admin: CSV import of products ---- */
+const num = v => { // accepts 18.99, 18,99, "$18.99"
+  let s = String(v ?? '').replace(/[^\d.,-]/g, '');
+  if (s.includes(',') && !s.includes('.')) s = s.replace(',', '.'); else s = s.replace(/,/g, '');
+  return s === '' ? NaN : Number(s);
+};
+route('POST', '/api/admin/import/products', { auth: 'admin', bodyLimit: 3 * 1024 * 1024 }, ({ body }) => {
+  const table = parseCsv(String(body.csv || ''));
+  if (table.length < 2) throw bad('The file is empty. Export your products first and use that file as a template.');
+  if (table.length > 2001) throw bad('Please import at most 2000 products at a time.');
+  const head = table[0].map(h => h.trim().toLowerCase().replace(/[\s-]+/g, '_'));
+  for (const col of ['name', 'category', 'price', 'stock']) if (!head.includes(col)) throw bad(`The first row must contain a "${col}" column.`);
+  const get = (row, col) => { const i = head.indexOf(col); return i < 0 ? '' : unQuote(String(row[i] ?? '').trim()); };
+
+  const plan = [], errors = [];
+  table.slice(1).forEach((row, idx) => {
+    const line = idx + 2; // spreadsheet row number (row 1 is the header)
+    try {
+      const priceCents = Math.round(num(get(row, 'price')) * 100);
+      const p = parseProduct({
+        name: get(row, 'name'), category: get(row, 'category'), description: get(row, 'description'), priceCents,
+        discountPercent: head.includes('discount_percent') && get(row, 'discount_percent') !== '' ? num(get(row, 'discount_percent')) : 0,
+        stock: num(get(row, 'stock')), featured: /^(yes|true|1|x|y)$/i.test(get(row, 'featured')),
+        images: get(row, 'images').split(/\s*[|\n]\s*/).filter(Boolean)
+      });
+      const id = get(row, 'id');
+      plan.push({ p, id: id && getProduct(id) ? id : null });
+    } catch (e) { errors.push({ row: line, message: e.message }); }
+  });
+  if (errors.length) return { created: 0, updated: 0, errors: errors.slice(0, 30), moreErrors: Math.max(0, errors.length - 30) };
+
+  let created = 0, updated = 0; // nothing is saved unless every row is valid
+  tx(() => plan.forEach(({ p, id }) => { if (id) { updateProduct(id, p); updated++; } else { insertProduct(p); created++; } }));
+  return { created, updated, errors: [] };
+});
 
 /* ------------------------------------------------------------------ */
 /* Server                                                              */
@@ -446,7 +619,7 @@ async function handleApi(req, res, url) {
   const params = {}; r.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); });
   const body = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) ? await readBody(req, r.opts.bodyLimit || 100 * 1024) : {};
   const query = Object.fromEntries(url.searchParams);
-  const result = await r.handler({ req, res, params, body, query, user, ip: req.socket.remoteAddress });
+  const result = await r.handler({ req, res, params, body, query, user: user && toUser(user), ip: req.socket.remoteAddress });
   if (!res.headersSent) send(res, 200, result, SECURITY_HEADERS);
 }
 
@@ -468,5 +641,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-loadDb();
 server.listen(PORT, () => console.log(`Kitty Ecommerce running at http://localhost:${PORT}`));
+process.on('SIGINT', () => { db.close(); process.exit(0); });
+process.on('SIGTERM', () => { db.close(); process.exit(0); });
