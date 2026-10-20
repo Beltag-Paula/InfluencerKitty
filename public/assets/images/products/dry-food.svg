@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><circle cx="200" cy="205" r="160" fill="#e3ecff"/><ellipse cx="200" cy="334" rx="115" ry="12" fill="#1b1a2e" opacity=".12"/>
+<path d="M118 100 L282 100 L298 330 L102 330Z" fill="#2c3a7a"/><rect x="112" y="90" width="176" height="20" rx="5" fill="#1f2a5c"/>
+<rect x="132" y="160" width="136" height="130" rx="20" fill="#fff6e4"/>
+<g transform="translate(200 214) scale(.55)">
+  <polygon points="-58,-18 -52,-84 -12,-46" fill="#1b1a2e"/><polygon points="58,-18 52,-84 12,-46" fill="#1b1a2e"/>
+  <polygon points="-48,-34 -46,-68 -24,-46" fill="#e58a9b" opacity=".85"/><polygon points="48,-34 46,-68 24,-46" fill="#e58a9b" opacity=".85"/>
+  <ellipse cx="0" cy="0" rx="64" ry="55" fill="#1b1a2e"/>
+  <ellipse cx="-26" cy="-4" rx="15" ry="17" fill="#f2b632"/><ellipse cx="26" cy="-4" rx="15" ry="17" fill="#f2b632"/>
+  <ellipse cx="-26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/><ellipse cx="26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/>
+  <circle cx="-21" cy="-11" r="4" fill="#fff"/><circle cx="31" cy="-11" r="4" fill="#fff"/>
+  <polygon points="-7,19 7,19 0,28" fill="#e58a9b"/>
+  <path d="M0 28 Q-5 37 -13 33 M0 28 Q5 37 13 33" stroke="#e58a9b" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <g stroke="#9a9aa0" stroke-width="2" stroke-linecap="round">
+    <line x1="-40" y1="24" x2="-82" y2="16"/><line x1="-40" y1="31" x2="-82" y2="35"/>
+    <line x1="40" y1="24" x2="82" y2="16"/><line x1="40" y1="31" x2="82" y2="35"/></g>
+  </g>
+<text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="16" fill="#2c3a7a">Crunchy Bites</text>
+<g fill="#f2b632"><circle cx="150" cy="130" r="9"/><circle cx="178" cy="124" r="6"/><circle cx="226" cy="128" r="8"/><circle cx="252" cy="122" r="6"/></g></svg>

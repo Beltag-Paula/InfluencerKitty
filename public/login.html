@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/assets/images/logo/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<title>Log in - Kitty</title>
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="container"><div class="auth panel">
+  <div class="tabs" role="tablist"><button type="button" role="tab" id="tab-login" class="active">Log in</button><button type="button" role="tab" id="tab-signup">Create account</button></div>
+  <form id="login-form" novalidate>
+    <div class="form-error" id="login-error" role="alert"></div>
+    <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+    <button class="btn btn-block" type="submit">Log in</button>
+  </form>
+  <form id="signup-form" novalidate hidden>
+    <div class="form-error" id="signup-error" role="alert"></div>
+    <div class="field"><label for="s-name">Your name</label><input id="s-name" type="text" autocomplete="name" required maxlength="60"></div>
+    <div class="field"><label for="s-email">Email</label><input id="s-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="s-pass">Password</label><input id="s-pass" type="password" autocomplete="new-password" minlength="8" required><p class="hint">At least 8 characters.</p></div>
+    <button class="btn btn-block" type="submit">Create account</button>
+  </form>
+</div></div></main>
+<div id="site-footer"></div>
+<script src="/assets/js/common.js"></script>
+<script src="/assets/js/login.js"></script>
+</body>
+</html>

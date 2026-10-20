@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/assets/images/logo/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+<title>Kitty - Everything your cat wants</title>
+</head>
+<body>
+<div id="site-header"></div>
+<main>
+  <div class="container">
+    <section class="hero" aria-label="Featured">
+      <div class="slide slide-night active">
+        <div class="slide-text"><h1>Night-time zoomies, sorted</h1><p>Cozy beds, climbing trees and toys for cats who rule after dark.</p><a class="btn" href="/?category=Beds%20%26%20Trees#shop">Shop beds and trees</a></div>
+        <div class="slide-art"><img src="/assets/images/hero/hero-night.svg" alt="A black cat sitting in front of a full moon"></div>
+      </div>
+      <div class="slide slide-sun">
+        <div class="slide-text"><h2>Up to 30% off toys and treats</h2><p>Feather wands, plush mice and catnip fish. Your cat will pounce on these prices.</p><a class="btn" href="/?sale=1#shop">See the sale</a></div>
+        <div class="slide-art"><img src="/assets/images/hero/hero-yarn.svg" alt="A black cat next to a ball of yarn"></div>
+      </div>
+      <div class="slide slide-mint">
+        <div class="slide-text"><h2>If it fits, it ships</h2><p>Carriers, collars and everything for trips to the vet and beyond.</p><a class="btn" href="/?category=Collars%20%26%20Travel#shop">Shop travel gear</a></div>
+        <div class="slide-art"><img src="/assets/images/hero/hero-box.svg" alt="A black cat peeking out of a cardboard box"></div>
+      </div>
+      <div class="hero-dots" id="hero-dots"></div>
+    </section>
+
+    <div class="cat-row" id="categories"></div>
+
+    <section class="section" id="shop">
+      <div class="section-head"><h2 id="shop-title">All products</h2><span class="muted" id="result-count"></span></div>
+      <div class="toolbar">
+        <div class="chips" id="chips"></div>
+        <label class="muted" style="margin:0">Sort by <select id="sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="discount">Biggest discount</option><option value="rating">Top rated</option></select></label>
+      </div>
+      <div class="grid" id="products"><p class="empty">Loading cat stuff...</p></div>
+    </section>
+
+    <section class="section" id="deal-section" hidden></section>
+
+    <section class="section">
+      <div class="services">
+        <div class="service"><h4>Free shipping</h4><p>On every order over $50.</p></div>
+        <div class="service"><h4>Easy returns</h4><p>Unopened items can come back within 30 days.</p></div>
+        <div class="service"><h4>Secure checkout</h4><p>Pay by card, PayPal or on delivery.</p></div>
+        <div class="service"><h4>Real cat people</h4><p>Questions? We have cats and we answer.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="site-footer"></div>
+<script src="/assets/js/common.js"></script>
+<script src="/assets/js/home.js"></script>
+</body>
+</html>

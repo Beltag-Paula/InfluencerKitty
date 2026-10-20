@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#f2b632"/><g transform="translate(50 56) scale(.5)">
+  <polygon points="-58,-18 -52,-84 -12,-46" fill="#1b1a2e"/><polygon points="58,-18 52,-84 12,-46" fill="#1b1a2e"/>
+  <polygon points="-48,-34 -46,-68 -24,-46" fill="#e58a9b" opacity=".85"/><polygon points="48,-34 46,-68 24,-46" fill="#e58a9b" opacity=".85"/>
+  <ellipse cx="0" cy="0" rx="64" ry="55" fill="#1b1a2e"/>
+  <ellipse cx="-26" cy="-4" rx="15" ry="17" fill="#f2b632"/><ellipse cx="26" cy="-4" rx="15" ry="17" fill="#f2b632"/>
+  <ellipse cx="-26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/><ellipse cx="26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/>
+  <circle cx="-21" cy="-11" r="4" fill="#fff"/><circle cx="31" cy="-11" r="4" fill="#fff"/>
+  <polygon points="-7,19 7,19 0,28" fill="#e58a9b"/>
+  <path d="M0 28 Q-5 37 -13 33 M0 28 Q5 37 13 33" stroke="#e58a9b" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <g stroke="#6b5a2a" stroke-width="2" stroke-linecap="round">
+    <line x1="-40" y1="24" x2="-82" y2="16"/><line x1="-40" y1="31" x2="-82" y2="35"/>
+    <line x1="40" y1="24" x2="82" y2="16"/><line x1="40" y1="31" x2="82" y2="35"/></g>
+  </g></svg>

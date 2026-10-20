@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-90 -92 180 170"><title>Kitty</title>
+  <polygon points="-58,-18 -52,-84 -12,-46" fill="#1b1a2e"/><polygon points="58,-18 52,-84 12,-46" fill="#1b1a2e"/>
+  <polygon points="-48,-34 -46,-68 -24,-46" fill="#e58a9b" opacity=".85"/><polygon points="48,-34 46,-68 24,-46" fill="#e58a9b" opacity=".85"/>
+  <ellipse cx="0" cy="0" rx="64" ry="55" fill="#1b1a2e"/>
+  <ellipse cx="-26" cy="-4" rx="15" ry="17" fill="#f2b632"/><ellipse cx="26" cy="-4" rx="15" ry="17" fill="#f2b632"/>
+  <ellipse cx="-26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/><ellipse cx="26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/>
+  <circle cx="-21" cy="-11" r="4" fill="#fff"/><circle cx="31" cy="-11" r="4" fill="#fff"/>
+  <polygon points="-7,19 7,19 0,28" fill="#e58a9b"/>
+  <path d="M0 28 Q-5 37 -13 33 M0 28 Q5 37 13 33" stroke="#e58a9b" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <g stroke="#9a9aa0" stroke-width="2" stroke-linecap="round">
+    <line x1="-40" y1="24" x2="-82" y2="16"/><line x1="-40" y1="31" x2="-82" y2="35"/>
+    <line x1="40" y1="24" x2="82" y2="16"/><line x1="40" y1="31" x2="82" y2="35"/></g>
+  <path d="M-40 46 Q0 68 40 46" stroke="#e8534a" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="0" cy="62" r="9" fill="#f2b632"/><line x1="-5" y1="62" x2="5" y2="62" stroke="#a87a10" stroke-width="2"/></svg>

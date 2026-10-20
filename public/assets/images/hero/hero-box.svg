@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420">
+<g transform="translate(300 240)">
+  <g transform="translate(40 40)">
+  <polygon points="-58,-18 -52,-84 -12,-46" fill="#1b1a2e"/><polygon points="58,-18 52,-84 12,-46" fill="#1b1a2e"/>
+  <polygon points="-48,-34 -46,-68 -24,-46" fill="#e58a9b" opacity=".85"/><polygon points="48,-34 46,-68 24,-46" fill="#e58a9b" opacity=".85"/>
+  <ellipse cx="0" cy="0" rx="64" ry="55" fill="#1b1a2e"/>
+  <ellipse cx="-26" cy="-4" rx="15" ry="17" fill="#f2b632"/><ellipse cx="26" cy="-4" rx="15" ry="17" fill="#f2b632"/>
+  <ellipse cx="-26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/><ellipse cx="26" cy="-4" rx="4.5" ry="14" fill="#0d0c18"/>
+  <circle cx="-21" cy="-11" r="4" fill="#fff"/><circle cx="31" cy="-11" r="4" fill="#fff"/>
+  <polygon points="-7,19 7,19 0,28" fill="#e58a9b"/>
+  <path d="M0 28 Q-5 37 -13 33 M0 28 Q5 37 13 33" stroke="#e58a9b" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <g stroke="#d6d7ee" stroke-width="2" stroke-linecap="round">
+    <line x1="-40" y1="24" x2="-82" y2="16"/><line x1="-40" y1="31" x2="-82" y2="35"/>
+    <line x1="40" y1="24" x2="82" y2="16"/><line x1="40" y1="31" x2="82" y2="35"/></g>
+  </g></g>
+<polygon points="190,300 400,300 420,412 170,412" fill="#c99a63"/>
+<rect x="170" y="296" width="250" height="18" rx="6" fill="#a97b45"/>
+<ellipse cx="270" cy="296" rx="22" ry="12" fill="#1b1a2e"/><ellipse cx="318" cy="296" rx="22" ry="12" fill="#1b1a2e"/>
+<path d="M60 90 Q80 40 120 70" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" opacity=".7"/>
+<g transform="translate(110 150) rotate(-14)"><ellipse rx="52" ry="26" fill="#f2b632"/><polygon points="44,0 84,-26 84,26" fill="#e09a14"/><circle cx="-30" cy="-5" r="6" fill="#fff"/><circle cx="-31" cy="-5" r="3" fill="#1b1a2e"/></g>
+<line x1="110" y1="0" x2="110" y2="128" stroke="#fff" stroke-width="3" opacity=".8"/>
+<g transform="translate(500 120) rotate(12)"><ellipse rx="40" ry="20" fill="#e8534a"/><polygon points="34,0 66,-20 66,20" fill="#c43c34"/><circle cx="-22" cy="-4" r="5" fill="#fff"/><circle cx="-23" cy="-4" r="2.5" fill="#1b1a2e"/></g>
+<line x1="500" y1="0" x2="500" y2="102" stroke="#fff" stroke-width="3" opacity=".8"/></svg>

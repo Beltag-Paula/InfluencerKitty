@@ -1,29 +1,14 @@
 {
-  "name": "influencerkitty",
+  "name": "kitty-ecommerce",
   "version": "1.0.0",
-  "description": "",
-  "main": "backend.js",
+  "description": "Kitty Ecommerce - a cat shop with accounts, cart, checkout UI and an admin dashboard (vanilla HTML/CSS/JS + dependency-free Node backend).",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon backend.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "better-sqlite3": "^12.5.0",
-    "better-sqlite3-session-store": "^0.1.0",
-    "body-parser": "^2.2.1",
-    "ejs": "^3.1.10",
-    "express": "^5.2.1",
-    "express-session": "^1.18.2",
-    "fkill": "^10.0.3",
-    "mysql": "^2.18.1",
-    "passport": "^0.7.0",
-    "passport-local": "^1.0.0"
+  "engines": {
+    "node": ">=18"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.11"
-  }
+  "license": "MIT"
 }
