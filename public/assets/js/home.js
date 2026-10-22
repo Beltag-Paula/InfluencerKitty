@@ -23,6 +23,15 @@
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => show(current + 1), 6000);
   }
   show(0); restart();
+  // swipe left/right on phones
+  let touchX = null;
+  const hero = $('.hero');
+  hero.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+  hero.addEventListener('touchend', e => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+    if (Math.abs(dx) > 45) { show(current + (dx < 0 ? 1 : -1)); restart(); }
+  });
 
   /* ---- filters come from the address bar so links like /?category=Toys work ---- */
   const params = new URLSearchParams(location.search);

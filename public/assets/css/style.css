@@ -12,20 +12,24 @@
   --teal: #1f9d95;
   --ok: #23875d;
   --radius: 14px;
+  --gutter: 16px;
   --font-head: 'Fredoka', 'Trebuchet MS', 'Segoe UI', sans-serif;
   --font-body: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--paper); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; -webkit-tap-highlight-color: rgba(242, 182, 50, .3); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); font-family: var(--font-body); color: var(--ink); background: var(--paper); line-height: 1.55; -webkit-font-smoothing: antialiased; }
 img { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, h4 { font-family: var(--font-head); line-height: 1.2; margin: 0 0 .5em; font-weight: 600; }
 p { margin: 0 0 1em; }
 button, input, select, textarea { font: inherit; color: inherit; }
+/* 16px stops iPhones from zooming in when a field is tapped */
+input, select, textarea { font-size: 16px; }
+a, button, input, select, label, summary { touch-action: manipulation; }
 :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 [hidden] { display: none !important; }
-.container { width: min(1200px, 100% - 32px); margin-inline: auto; }
+.container { width: min(1200px, 100% - 2 * var(--gutter)); margin-inline: auto; }
 .page { padding: 36px 0 70px; min-height: 60vh; }
 .muted { color: var(--muted); }
 
@@ -112,7 +116,7 @@ textarea { min-height: 110px; resize: vertical; }
 .chip { padding: 7px 16px; border-radius: 99px; border: 1.5px solid var(--line); background: #fff; font-weight: 700; font-size: .9rem; cursor: pointer; }
 .chip:hover { border-color: var(--ink); }
 .chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-.toolbar select { width: auto; padding: 8px 12px; }
+.toolbar select { width: auto; padding: 8px 12px; font-size: 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
 .card { display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; transition: border-color .15s; }
 .card:hover { border-color: var(--ink); }
@@ -123,6 +127,7 @@ textarea { min-height: 110px; resize: vertical; }
 .card-body { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px 16px; flex: 1; }
 .card-cat { font-size: .82rem; color: var(--teal); font-weight: 700; }
 .card h3 { font-size: 1.05rem; margin: 0; }
+.card h3 a { display: block; padding: 2px 0; }
 .card h3 a:hover { text-decoration: underline; }
 .stars { color: var(--amber-deep); letter-spacing: 1px; font-size: .95rem; }
 .stars .off { color: #dedbea; }
@@ -186,7 +191,7 @@ textarea { min-height: 110px; resize: vertical; }
 .sticky { position: sticky; top: 16px; }
 .pay-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: 12px; margin-bottom: 10px; cursor: pointer; font-weight: 700; }
 .pay-option:has(input:checked) { border-color: var(--ink); background: var(--moon); }
-.pay-option input { width: 18px; height: 18px; accent-color: var(--ink); }
+.pay-option input { flex: none; width: 22px; height: 22px; accent-color: var(--ink); }
 .pay-option small { display: block; font-weight: 400; color: var(--muted); }
 .pay-detail { padding: 6px 4px 4px; }
 .demo-note { background: #fff7e0; border: 1px solid #f1dd9a; border-radius: 10px; padding: 10px 14px; font-size: .88rem; margin-bottom: 16px; }
@@ -219,32 +224,129 @@ textarea { min-height: 110px; resize: vertical; }
 .footer h4 { color: #fff; font-size: 1rem; }
 .footer a:not(.logo) { display: block; padding: 3px 0; }
 .footer a:not(.logo):hover { color: var(--amber); }
-.footer-bottom { border-top: 1px solid #38365a; margin-top: 30px; padding: 18px 0 26px; font-size: .85rem; }
+.footer-bottom { border-top: 1px solid #38365a; margin-top: 30px; padding: 18px 0 calc(26px + env(safe-area-inset-bottom)); font-size: .85rem; }
 
 /* ---------- toasts ---------- */
-#toasts { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 100; }
+#toasts { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 8px; z-index: 100; }
 .toast { background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 700; box-shadow: 0 10px 28px rgba(27, 26, 46, .3); border-left: 5px solid var(--amber); }
 .toast.err { border-left-color: var(--coral); }
 
-/* ---------- responsive ---------- */
+/* ---------- responsive: tablets and phones ---------- */
+/* hide scrollbars on the swipeable rows (they still scroll) */
+.nav .container, .chips, .cat-row { scrollbar-width: none; }
+.nav .container::-webkit-scrollbar, .chips::-webkit-scrollbar, .cat-row::-webkit-scrollbar { display: none; }
+
 @media (max-width: 900px) {
   .two-col, .product, .deal { grid-template-columns: 1fr; }
   .deal { padding: 24px; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .sticky { position: static; }
-  .slide { flex-direction: column-reverse; padding: 24px; text-align: center; min-height: 0; }
-  .slide-art img { max-height: 220px; }
+  .slide { flex-direction: column-reverse; padding: 24px 24px 48px; text-align: center; min-height: 0; }
+  .slide-art img { max-height: 230px; }
   .slide-text p { margin-inline: auto; }
+  .page { padding: 26px 0 56px; }
 }
+
+/* phones in landscape: keep the hero side by side so it is not taller than the screen */
+@media (max-height: 520px) and (orientation: landscape) {
+  .slide { flex-direction: row; text-align: left; padding: 18px 28px 36px; min-height: 0; }
+  .slide-art img { max-height: 170px; }
+  .slide-text h1, .slide-text h2 { font-size: 1.7rem; }
+  .slide-text p { margin-inline: 0; }
+}
+
 @media (max-width: 680px) {
+  :root { --gutter: 14px; }
+  .topbar { font-size: .8rem; }
   .topbar span:last-child { display: none; }
-  .header-row { flex-wrap: wrap; gap: 10px; }
+  .topbar .container { justify-content: center; padding: 7px 0; }
+  .header-row { flex-wrap: wrap; gap: 8px 10px; padding: 10px 0; }
+  .logo { font-size: 1.55rem; gap: 8px; }
+  .logo img { width: 42px; height: auto; }
   .search { order: 3; flex-basis: 100%; max-width: none; }
+  .search input, .search button { height: 44px; }
   .header-actions { margin-left: auto; }
-  .field-row { grid-template-columns: 1fr; }
-  .cart-line { grid-template-columns: 64px 1fr; }
-  .cart-line img { width: 64px; height: 64px; }
+  .nav a { padding: 12px 12px; }
+
+  h1 { font-size: 1.7rem; }
+  .section { margin-top: 40px; }
+  .section-head h2 { font-size: 1.4rem; }
+  .hero { margin-top: 14px; border-radius: 18px; }
+  .slide { padding: 20px 18px 44px; gap: 10px; }
+  .slide-art img { max-height: 190px; }
+  .slide-text h1, .slide-text h2 { font-size: 1.75rem; }
+  .slide-text p { font-size: 1rem; }
+
+  /* categories and filter chips become swipeable rows instead of tall stacks */
+  .cat-row { display: flex; overflow-x: auto; scroll-snap-type: x proximity; gap: 10px; margin: 18px calc(-1 * var(--gutter)) 0; padding: 2px var(--gutter) 6px; }
+  .cat-tile { flex: 0 0 190px; scroll-snap-align: start; }
+  .toolbar { gap: 10px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; width: calc(100% + 2 * var(--gutter)); margin-inline: calc(-1 * var(--gutter)); padding: 2px var(--gutter) 6px; }
+  .chip { flex: none; }
+  .toolbar > label { width: 100%; display: flex; align-items: center; gap: 10px; }
+  .toolbar select { flex: 1; }
+
+  /* two products per row, like most phone shops */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .card-body { padding: 10px 12px 12px; gap: 3px; }
+  .card h3 { font-size: .95rem; }
+  .card-cat { font-size: .75rem; }
+  .price strong { font-size: 1.1rem; }
+  .price { flex-wrap: wrap; gap: 2px 8px; margin-bottom: 8px; }
+  .badge { top: 8px; left: 8px; font-size: .72rem; padding: 2px 9px; }
+  .badge.out { right: 8px; }
+  .card .btn { padding-inline: 10px; }
+  .deal { padding: 20px; gap: 18px; border-radius: 18px; }
+  .deal h2 { font-size: 1.5rem; }
+
+  .product { gap: 22px; }
+  .product-info h1 { font-size: 1.7rem; }
+  .gallery-main { border-radius: 16px; }
+  .buy-row .btn { flex: 1; }
+
+  .panel { padding: 18px 16px; }
+  .field-row { grid-template-columns: 1fr; gap: 0; }
+  .field-row.keep { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cart-line { grid-template-columns: 72px 1fr; gap: 6px 14px; }
+  .cart-line img { width: 72px; height: 72px; }
   .cart-line .line-total { grid-column: 2; text-align: left; }
-  .footer-grid { grid-template-columns: 1fr; }
+  .order-head { flex-direction: column; align-items: flex-start; }
+  .footer { padding-top: 32px; }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 22px 16px; }
+  .footer-grid > :first-child, .footer-grid > :last-child { grid-column: 1 / -1; }
+  #toasts { left: 14px; right: 14px; }
 }
+
+@media (max-width: 360px) {
+  :root { --gutter: 10px; }
+  .logo span { font-size: 1.35rem; }
+  .cat-tile { flex-basis: 170px; }
+  .grid { gap: 10px; }
+}
+
+/* touch screens: finger-sized tap targets (about 44px, Apple and Google's guidance) */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 44px; padding-inline: 18px; }
+  .chip { min-height: 44px; display: inline-flex; align-items: center; }
+  .icon-btn { min-height: 44px; }
+  .nav a { padding-block: 14px; }
+  .qty button { width: 44px; height: 44px; }
+  .link-btn { min-height: 44px; padding: 8px 4px; }
+  .footer a:not(.logo) { padding: 10px 0; }
+  .crumbs a { display: inline-block; padding: 10px 2px; }
+  .logo { min-height: 44px; }
+  .card h3 a { padding: 9px 0; }
+  .cart-line h3 a { display: inline-block; padding: 9px 0; }
+  .dropdown a, .dropdown button { padding: 14px 12px; }
+  .tabs button { min-height: 44px; }
+  .thumbs button { width: 64px; height: 64px; }
+  select, input[type=text], input[type=email], input[type=password], input[type=number], input[type=tel], input[type=search] { min-height: 44px; }
+  .hero-dots { gap: 14px; }
+  .hero-dots button { position: relative; }
+  .hero-dots button::after { content: ''; position: absolute; inset: -16px -7px; } /* bigger hit area, same look */
+  .check input, .pay-option input { min-width: 22px; }
+}
+
+@media (hover: none) { .card:hover { border-color: var(--line); } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }

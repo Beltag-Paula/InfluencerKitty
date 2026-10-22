@@ -62,10 +62,10 @@
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Discount</th><th>Stock</th><th></th></tr></thead><tbody>
       ${products.map(p => `<tr data-id="${esc(p.id)}">
         <td><div class="prod-cell"><img class="thumb" src="${esc(p.images[0] || '/assets/images/logo/logo-cat.svg')}" alt=""><div><strong>${esc(p.name)}</strong>${p.featured ? '<br><span class="muted">Featured</span>' : ''}</div></div></td>
-        <td>${esc(p.category)}</td>
-        <td>${p.discountPercent ? `<strong>${money(p.finalCents)}</strong> <del class="muted">${money(p.priceCents)}</del>` : money(p.priceCents)}</td>
-        <td>${p.discountPercent ? p.discountPercent + '%' : '-'}</td>
-        <td class="${p.stock <= 5 ? 'low' : ''}">${p.stock}</td>
+        <td data-label="Category">${esc(p.category)}</td>
+        <td data-label="Price">${p.discountPercent ? `<strong>${money(p.finalCents)}</strong> <del class="muted">${money(p.priceCents)}</del>` : money(p.priceCents)}</td>
+        <td data-label="Discount">${p.discountPercent ? p.discountPercent + '%' : '-'}</td>
+        <td data-label="Stock" class="${p.stock <= 5 ? 'low' : ''}">${p.stock}</td>
         <td><div class="actions"><button class="btn btn-sm btn-ghost" data-edit>Edit</button><button class="btn btn-sm btn-danger" data-delete>Delete</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="muted">No products yet.</td></tr>'}
       </tbody></table></div>`;
   }
@@ -176,11 +176,11 @@
       <div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Payment</th><th>Total</th><th>Status</th></tr></thead><tbody>
       ${list.map(o => `<tr>
         <td><button class="link-btn" style="color:var(--ink)" data-toggle-order="${esc(o.id)}"><strong>${esc(o.number)}</strong> (details)</button></td>
-        <td>${esc(o.userName)}<br><span class="muted">${esc(o.userEmail)}</span></td>
-        <td>${dateStr(o.createdAt)}</td>
-        <td>${esc(o.paymentMethod)}<br><span class="muted">${esc(o.paymentStatus)}</span></td>
-        <td>${money(o.totalCents)}</td>
-        <td><select data-order="${esc(o.id)}" aria-label="Status of ${esc(o.number)}">${STATUSES.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>
+        <td data-label="Customer">${esc(o.userName)}<br><span class="muted">${esc(o.userEmail)}</span></td>
+        <td data-label="Date">${dateStr(o.createdAt)}</td>
+        <td data-label="Payment">${esc(o.paymentMethod)}<br><span class="muted">${esc(o.paymentStatus)}</span></td>
+        <td data-label="Total">${money(o.totalCents)}</td>
+        <td data-label="Status"><select data-order="${esc(o.id)}" aria-label="Status of ${esc(o.number)}">${STATUSES.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>
         <tr class="order-detail" id="detail-${esc(o.id)}" hidden><td colspan="6">
           <strong>Items</strong><ul>${o.items.map(i => `<li>${esc(i.name)} &times; ${i.qty} (${money(i.unitCents * i.qty)})</li>`).join('')}</ul>
           <p style="margin:10px 0 0"><strong>Ship to:</strong> ${esc(o.shipping.fullName)}, ${esc(o.shipping.address)}, ${esc(o.shipping.zip)} ${esc(o.shipping.city)}, ${esc(o.shipping.country)} &middot; ${esc(o.shipping.phone)}</p>
@@ -200,7 +200,7 @@
     const list = (await api('/admin/users')).users;
     view.innerHTML = `<div class="page-head"><h1>Customers</h1>${exportBtn('customers')}</div>
       <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Orders</th></tr></thead><tbody>
-      ${list.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td>${dateStr(u.createdAt)}</td><td>${u.orders}</td></tr>`).join('')}
+      ${list.map(u => `<tr><td data-label="Name">${esc(u.name)}</td><td data-label="Email">${esc(u.email)}</td><td data-label="Role">${esc(u.role)}</td><td data-label="Joined">${dateStr(u.createdAt)}</td><td data-label="Orders">${u.orders}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 

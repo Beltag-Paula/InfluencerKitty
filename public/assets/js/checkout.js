@@ -30,7 +30,7 @@
           <div class="field"><label for="country">Country</label><input id="country" type="text" autocomplete="country-name" required></div>
         </div>
         <div class="field"><label for="address">Street address</label><input id="address" type="text" autocomplete="street-address" required></div>
-        <div class="field-row">
+        <div class="field-row keep">
           <div class="field"><label for="city">City</label><input id="city" type="text" autocomplete="address-level2" required></div>
           <div class="field"><label for="zip">Postal code</label><input id="zip" type="text" autocomplete="postal-code" required></div>
         </div>
@@ -42,7 +42,7 @@
         <div class="pay-detail" id="pay-card">
           <div class="field"><label for="cc-name">Name on card</label><input id="cc-name" type="text" autocomplete="cc-name"></div>
           <div class="field"><label for="cc-number">Card number</label><input id="cc-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="23"></div>
-          <div class="field-row">
+          <div class="field-row keep">
             <div class="field"><label for="cc-exp">Expiry (MM/YY)</label><input id="cc-exp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5"></div>
             <div class="field"><label for="cc-cvc">CVC</label><input id="cc-cvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div>
           </div>
